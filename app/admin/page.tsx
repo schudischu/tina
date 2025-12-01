@@ -2,62 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-
-interface Appointment {
-  id: string;
-  date: string;
-  time: string;
-  course: string;
-  maxParticipants: number;
-  currentBookings: number;
-  bookings: Booking[];
-}
-
-interface Booking {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  bookedAt: string;
-}
+import { useAppContext } from '../context/AppContext';
 
 export default function AdminPage() {
+  const { appointments, addAppointment, deleteAppointment } = useAppContext();
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    {
-      id: '1',
-      date: '2025-12-02',
-      time: '08:00',
-      course: 'Morgen Flow',
-      maxParticipants: 8,
-      currentBookings: 5,
-      bookings: [
-        { id: '1', customerName: 'Anna Müller', customerEmail: 'anna@example.com', bookedAt: '2025-12-01' },
-        { id: '2', customerName: 'Sarah Schmidt', customerEmail: 'sarah@example.com', bookedAt: '2025-12-01' },
-        { id: '3', customerName: 'Lisa Wagner', customerEmail: 'lisa@example.com', bookedAt: '2025-12-01' },
-        { id: '4', customerName: 'Maria Fischer', customerEmail: 'maria@example.com', bookedAt: '2025-12-01' },
-        { id: '5', customerName: 'Julia Weber', customerEmail: 'julia@example.com', bookedAt: '2025-12-01' },
-      ]
-    },
-    {
-      id: '2',
-      date: '2025-12-02',
-      time: '09:30',
-      course: 'Anfänger Pilates',
-      maxParticipants: 10,
-      currentBookings: 8,
-      bookings: []
-    },
-    {
-      id: '3',
-      date: '2025-12-02',
-      time: '18:00',
-      course: 'Fortgeschrittene',
-      maxParticipants: 8,
-      currentBookings: 3,
-      bookings: []
-    },
-  ]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
     date: '',
@@ -78,20 +28,14 @@ export default function AdminPage() {
 
   const handleAddAppointment = (e: React.FormEvent) => {
     e.preventDefault();
-    const appointment: Appointment = {
-      id: Date.now().toString(),
-      ...newAppointment,
-      currentBookings: 0,
-      bookings: []
-    };
-    setAppointments([...appointments, appointment]);
+    addAppointment(newAppointment);
     setNewAppointment({ date: '', time: '', course: '', maxParticipants: 8 });
     setShowAddForm(false);
   };
 
   const handleDeleteAppointment = (id: string) => {
     if (confirm('Möchten Sie diesen Termin wirklich löschen?')) {
-      setAppointments(appointments.filter(app => app.id !== id));
+      deleteAppointment(id);
     }
   };
 

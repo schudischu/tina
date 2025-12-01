@@ -1,48 +1,63 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useAppContext, Appointment } from '../context/AppContext';
 
 interface TimeSlot {
-  id: string;
+  appointmentId: string;
   time: string;
   date: string;
   available: boolean;
   course: string;
+  spotsLeft: number;
 }
 
 export default function BookingPage() {
+  const { appointments, addBooking } = useAppContext();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // Sample time slots - in production würde dies aus einer Datenbank kommen
-  const timeSlots: TimeSlot[] = [
-    { id: '1', time: '08:00', date: selectedDate, available: true, course: 'Morgen Flow' },
-    { id: '2', time: '09:30', date: selectedDate, available: true, course: 'Anfänger Pilates' },
-    { id: '3', time: '11:00', date: selectedDate, available: false, course: 'Fortgeschrittene' },
-    { id: '4', time: '14:00', date: selectedDate, available: true, course: 'Rücken Pilates' },
-    { id: '5', time: '16:00', date: selectedDate, available: true, course: 'Anfänger Pilates' },
-    { id: '6', time: '18:00', date: selectedDate, available: true, course: 'Fortgeschrittene' },
-    { id: '7', time: '19:30', date: selectedDate, available: false, course: 'Prenatal Pilates' },
-  ];
+  // Konvertiere Appointments zu TimeSlots für das gewählte Datum
+  const timeSlots: TimeSlot[] = useMemo(() => {
+    return appointments
+      .filter((app: Appointment) => app.date === selectedDate)
+      .map((app: Appointment) => ({
+        appointmentId: app.id,
+        time: app.time,
+        date: app.date,
+        course: app.course,
+        available: app.currentBookings < app.maxParticipants,
+        spotsLeft: app.maxParticipants - app.currentBookings
+      }))
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [appointments, selectedDate]);
 
   const handleBooking = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedSlot && customerName && customerEmail) {
-      // Hier würde die Buchung in der Datenbank gespeichert
-      console.log('Buchung:', { selectedSlot, customerName, customerEmail });
-      setShowConfirmation(true);
+      // Buchung speichern
+      const success = addBooking(selectedSlot.appointmentId, {
+        customerName,
+        customerEmail
+      });
       
-      // Reset nach 3 Sekunden
-      setTimeout(() => {
-        setShowConfirmation(false);
-        setSelectedSlot(null);
-        setCustomerName('');
-        setCustomerEmail('');
-      }, 3000);
+      if (success) {
+        setShowConfirmation(true);
+        
+        // Reset nach 3 Sekunden
+        setTimeout(() => {
+          setShowConfirmation(false);
+          setSelectedSlot(null);
+          setCustomerName('');
+          setCustomerEmail('');
+        }, 3000);
+      } else {
+        alert('Dieser Termin ist leider bereits ausgebucht oder nicht mehr verfügbar.');
+      }
     }
   };
 
@@ -120,26 +135,39 @@ export default function BookingPage() {
         {/* Time Slots */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-8">
           <h2 className="text-2xl font-light text-pilates-dark mb-8">Verfügbare Zeiten</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {timeSlots.map((slot) => (
-              <button
-                key={slot.id}
-                onClick={() => slot.available && setSelectedSlot(slot)}
-                disabled={!slot.available}
-                className={`p-5 rounded-lg border transition ${
-                  selectedSlot?.id === slot.id
-                    ? 'border-pilates-secondary bg-pilates-light shadow-md'
-                    : slot.available
-                    ? 'border-gray-200 hover:border-pilates-secondary hover:shadow-sm bg-white'
-                    : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                }`}
-              >
-                <div className="text-xl font-light text-pilates-dark mb-1">{slot.time}</div>
-                <div className="text-sm text-gray-600 font-light">{slot.course}</div>
-                {!slot.available && <div className="text-xs text-red-400 mt-2 font-light">Ausgebucht</div>}
-              </button>
-            ))}
-          </div>
+          {timeSlots.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 font-light">Für dieses Datum sind noch keine Termine verfügbar.</p>
+              <p className="text-sm text-gray-400 font-light mt-2">Bitte wählen Sie ein anderes Datum oder kontaktieren Sie uns.</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {timeSlots.map((slot) => (
+                <button
+                  key={slot.appointmentId}
+                  onClick={() => slot.available && setSelectedSlot(slot)}
+                  disabled={!slot.available}
+                  className={`p-5 rounded-lg border transition ${
+                    selectedSlot?.appointmentId === slot.appointmentId
+                      ? 'border-pilates-secondary bg-pilates-light shadow-md'
+                      : slot.available
+                      ? 'border-gray-200 hover:border-pilates-secondary hover:shadow-sm bg-white'
+                      : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="text-xl font-light text-pilates-dark mb-1">{slot.time}</div>
+                  <div className="text-sm text-gray-600 font-light">{slot.course}</div>
+                  {slot.available ? (
+                    <div className="text-xs text-green-500 mt-2 font-light">
+                      {slot.spotsLeft} {slot.spotsLeft === 1 ? 'Platz' : 'Plätze'} frei
+                    </div>
+                  ) : (
+                    <div className="text-xs text-red-400 mt-2 font-light">Ausgebucht</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Booking Form */}
